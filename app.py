@@ -16,19 +16,16 @@ from flask import (
     flash,
     abort,
     send_file,
-    jsonify
+    jsonify,
 )
 
 from werkzeug.security import (
     generate_password_hash,
-    check_password_hash
+    check_password_hash,
 )
 
-# =========================================================
-# GOOGLE GEMINI
-# =========================================================
-
 from google import genai
+from google.genai import types
 
 
 # =========================================================
@@ -63,7 +60,6 @@ if GEMINI_API_KEY:
         gemini_client = genai.Client(
             api_key=GEMINI_API_KEY
         )
-        print("Gemini client başarıyla oluşturuldu.")
     except Exception as e:
         print(
             "Gemini client oluşturulamadı:",
@@ -74,10 +70,7 @@ else:
     gemini_client = None
 
 
-# =========================================================
-# FAZİLETCODEAI MODEL
-# =========================================================
-
+# Render Environment bölümünden değiştirilebilir.
 AI_MODEL = os.environ.get(
     "FAZILETCODEAI_MODEL",
     "gemini-3.6-flash"
@@ -102,9 +95,8 @@ def db():
 def turkey_today():
     """
     Türkiye UTC+3 kullanır.
-    Render sunucusunun UTC saatinden Türkiye tarihini hesaplar.
+    Render UTC saatinden Türkiye tarihini hesaplar.
     """
-
     return (
         datetime.now(timezone.utc)
         + timedelta(hours=3)
@@ -264,7 +256,7 @@ def init_db():
                     (
                         "4. Hafta - Arduino",
                         "Arduino ve temel elektronik devreler."
-                    )
+                    ),
                 ]
             )
 
@@ -299,7 +291,7 @@ def ctx():
 
     return {
         "current_user": user(),
-        "timedelta": timedelta
+        "timedelta": timedelta,
     }
 
 
@@ -310,14 +302,14 @@ def ctx():
 def login_req(f):
 
     @wraps(f)
-    def w(*a, **k):
+    def w(*args, **kwargs):
 
         if not user():
             return redirect(
                 url_for("login")
             )
 
-        return f(*a, **k)
+        return f(*args, **kwargs)
 
     return w
 
@@ -329,7 +321,7 @@ def login_req(f):
 def admin_req(f):
 
     @wraps(f)
-    def w(*a, **k):
+    def w(*args, **kwargs):
 
         current = user()
 
@@ -339,7 +331,7 @@ def admin_req(f):
         ):
             abort(403)
 
-        return f(*a, **k)
+        return f(*args, **kwargs)
 
     return w
 
@@ -353,7 +345,6 @@ def admin_req(f):
 def home():
 
     u = user()
-
     today = turkey_today()
 
     with db() as c:
@@ -407,7 +398,7 @@ def home():
         projects=projects,
         members=members,
         attendance=attendance,
-        today=today
+        today=today,
     )
 
 
@@ -450,7 +441,6 @@ def login():
         ):
 
             session.clear()
-
             session["uid"] = u["id"]
 
             return redirect(
@@ -467,7 +457,7 @@ def login():
 
 
 # =========================================================
-# FAZİLETCODEAI - GEMINI 3.6 FLASH
+# FAZİLETCODEAI - GEMINI
 # =========================================================
 
 @app.route(
@@ -476,10 +466,6 @@ def login():
 )
 @login_req
 def faziletcodeai_api():
-
-    # -----------------------------------------------------
-    # JSON AL
-    # -----------------------------------------------------
 
     data = request.get_json(
         silent=True
@@ -508,7 +494,7 @@ def faziletcodeai_api():
         }), 400
 
     # -----------------------------------------------------
-    # GEMINI CLIENT KONTROLÜ
+    # GEMINI KONTROLÜ
     # -----------------------------------------------------
 
     if not gemini_client:
@@ -524,14 +510,14 @@ def faziletcodeai_api():
         }), 503
 
     # -----------------------------------------------------
-    # KODU SINIRLA
+    # KOD SINIRI
     # -----------------------------------------------------
 
     if len(code) > 30000:
         code = code[:30000]
 
     # -----------------------------------------------------
-    # KULLANICI BİLGİSİ
+    # KULLANICI
     # -----------------------------------------------------
 
     current = user()
@@ -543,7 +529,7 @@ def faziletcodeai_api():
     )
 
     # -----------------------------------------------------
-    # SYSTEM INSTRUCTIONS
+    # SYSTEM INSTRUCTION
     # -----------------------------------------------------
 
     instructions = """
@@ -553,7 +539,7 @@ Sen Endertech Bilişim Atölyesi'nin
 kulüp üyelerine yardımcı olan bir
 yazılım ve teknoloji asistanısın.
 
-Görevin:
+Görevlerin:
 
 - HTML konusunda yardımcı olmak
 - CSS konusunda yardımcı olmak
@@ -571,14 +557,14 @@ Yanıtlarını Türkçe ver.
 Kullanıcı bir hata soruyorsa:
 
 1. Hatanın nedenini söyle.
-2. Nasıl düzeltileceğini göster.
+2. Nasıl düzeltileceğini açıkla.
 3. Gerekirse düzeltilmiş kod örneği ver.
 
 Kullanıcı kod gönderirse kodu dikkatlice incele.
 
 Gereksiz yere çok uzun cevap verme.
 
-Ancak kod hatasının çözümü için gereken
+Kod hatasının çözümü için gereken
 kod parçalarını eksiksiz göster.
 
 Tehlikeli, yasa dışı veya zarar verici
@@ -609,33 +595,25 @@ Kullanıcının üzerinde çalıştığı kod:
 Bu soruya yardımcı ol.
 
 Yanıtını Türkçe ver.
-
-Kod varsa kodu incele ve gerektiğinde
-düzeltilmiş kodu göster.
 """
 
     # -----------------------------------------------------
-    # GEMINI 3.6 FLASH - INTERACTIONS API
+    # GEMINI REQUEST
     # -----------------------------------------------------
 
     try:
 
-        interaction = gemini_client.interactions.create(
+        response = gemini_client.models.generate_content(
             model=AI_MODEL,
-            input=prompt,
-            system_instruction=instructions,
-            generation_config={
-                "max_output_tokens": 2000,
-                "thinking_level": "medium"
-            }
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=instructions,
+                max_output_tokens=2000,
+            ),
         )
 
         answer = (
-            getattr(
-                interaction,
-                "output_text",
-                None
-            )
+            getattr(response, "text", None)
             or ""
         ).strip()
 
@@ -721,7 +699,7 @@ def profile():
                 elif f.mimetype not in {
                     "image/png",
                     "image/jpeg",
-                    "image/webp"
+                    "image/webp",
                 }:
 
                     flash(
@@ -751,7 +729,7 @@ def profile():
                             (
                                 photo_data,
                                 f.mimetype,
-                                u["id"]
+                                u["id"],
                             )
                         )
 
@@ -810,7 +788,7 @@ def profile():
                             generate_password_hash(
                                 new_password
                             ),
-                            u["id"]
+                            u["id"],
                         )
                     )
 
@@ -939,7 +917,7 @@ def new_project():
                     user()["id"],
                     title,
                     html_code,
-                    python_code
+                    python_code,
                 )
             )
 
@@ -951,7 +929,7 @@ def new_project():
         "id": None,
         "title": "Yeni Proje",
         "html_code": "",
-        "python_code": ""
+        "python_code": "",
     }
 
     return render_template(
@@ -1005,23 +983,21 @@ def edit_project(pid):
                 or p["title"]
             )
 
-            html_code = (
-                data.get("html_code")
-                if "html_code" in data
-                else data.get(
+            if "html_code" in data:
+                html_code = data["html_code"]
+            else:
+                html_code = data.get(
                     "html",
                     p["html_code"]
                 )
-            )
 
-            python_code = (
-                data.get("python_code")
-                if "python_code" in data
-                else data.get(
+            if "python_code" in data:
+                python_code = data["python_code"]
+            else:
+                python_code = data.get(
                     "python",
                     p["python_code"]
                 )
-            )
 
         else:
 
@@ -1058,7 +1034,7 @@ def edit_project(pid):
                     title,
                     html_code,
                     python_code,
-                    pid
+                    pid,
                 )
             )
 
@@ -1160,7 +1136,6 @@ def attendance_mark():
 
     today = turkey_today()
 
-    # Sadece bugün işaretlenebilir.
     if day != today:
 
         flash(
@@ -1188,7 +1163,7 @@ def attendance_mark():
             """,
             (
                 u["id"],
-                day
+                day,
             )
         )
 
@@ -1313,7 +1288,7 @@ def member():
                     username,
                     generate_password_hash(
                         password
-                    )
+                    ),
                 )
             )
 
@@ -1371,7 +1346,7 @@ def reset(uid):
                 generate_password_hash(
                     password
                 ),
-                uid
+                uid,
             )
         )
 
@@ -1454,7 +1429,7 @@ def week():
             """,
             (
                 title,
-                description
+                description,
             )
         )
 
@@ -1509,7 +1484,7 @@ def att():
             (
                 uid,
                 selected_day,
-                present
+                present,
             )
         )
 
@@ -1540,7 +1515,4 @@ if __name__ == "__main__":
             )
         ),
         debug=False
-    )
-        ),
-        debug=False,
     )
