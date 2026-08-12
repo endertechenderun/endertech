@@ -25,7 +25,6 @@ from werkzeug.security import (
 )
 
 from google import genai
-from google.genai import types
 
 
 # =========================================================
@@ -39,6 +38,11 @@ app.secret_key = os.environ.get(
     "CHANGE_ME"
 )
 
+
+# =========================================================
+# DATABASE URL
+# =========================================================
+
 DB = os.environ.get("DATABASE_URL")
 
 if not DB:
@@ -51,9 +55,7 @@ if not DB:
 # GEMINI / FAZİLETCODEAI
 # =========================================================
 
-GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY"
-)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     try:
@@ -70,7 +72,7 @@ else:
     gemini_client = None
 
 
-# Render Environment bölümünden değiştirilebilir.
+# Gemini 3.6 Flash
 AI_MODEL = os.environ.get(
     "FAZILETCODEAI_MODEL",
     "gemini-3.6-flash"
@@ -95,8 +97,10 @@ def db():
 def turkey_today():
     """
     Türkiye UTC+3 kullanır.
-    Render UTC saatinden Türkiye tarihini hesaplar.
+    Render sunucusunun UTC saatinden
+    Türkiye tarihini hesaplar.
     """
+
     return (
         datetime.now(timezone.utc)
         + timedelta(hours=3)
@@ -457,7 +461,8 @@ def login():
 
 
 # =========================================================
-# FAZİLETCODEAI - GEMINI
+# FAZİLETCODEAI
+# GEMINI 3.6 FLASH + INTERACTIONS API
 # =========================================================
 
 @app.route(
@@ -466,6 +471,10 @@ def login():
 )
 @login_req
 def faziletcodeai_api():
+
+    # -----------------------------------------------------
+    # JSON
+    # -----------------------------------------------------
 
     data = request.get_json(
         silent=True
@@ -482,7 +491,7 @@ def faziletcodeai_api():
     )
 
     # -----------------------------------------------------
-    # SORU KONTROLÜ
+    # QUESTION CHECK
     # -----------------------------------------------------
 
     if not question:
@@ -494,7 +503,7 @@ def faziletcodeai_api():
         }), 400
 
     # -----------------------------------------------------
-    # GEMINI KONTROLÜ
+    # GEMINI CHECK
     # -----------------------------------------------------
 
     if not gemini_client:
@@ -503,21 +512,25 @@ def faziletcodeai_api():
             "answer": (
                 "FaziletCodeAI şu anda "
                 "yapılandırılmamış.\n\n"
-                "Render Environment bölümünde "
+                "Render > Environment bölümünde "
                 "GEMINI_API_KEY değişkenini "
                 "kontrol et."
             )
         }), 503
 
     # -----------------------------------------------------
-    # KOD SINIRI
+    # CODE LIMIT
     # -----------------------------------------------------
 
+    # Kullanıcıdan gelen kodun aşırı büyümesini önler.
+    # Gemini 3.6 Flash'ın input limiti çok yüksek olduğu
+    # için 30000 karakter sınırı güvenli bir uygulama
+    # sınırıdır.
     if len(code) > 30000:
         code = code[:30000]
 
     # -----------------------------------------------------
-    # KULLANICI
+    # CURRENT USER
     # -----------------------------------------------------
 
     current = user()
@@ -536,36 +549,83 @@ def faziletcodeai_api():
 Sen FaziletCodeAI'sin.
 
 Sen Endertech Bilişim Atölyesi'nin
-kulüp üyelerine yardımcı olan bir
-yazılım ve teknoloji asistanısın.
+kulüp üyelerine yardımcı olan gelişmiş
+bir yazılım ve teknoloji asistanısın.
 
-Görevlerin:
+Ana görevin öğrencilerin kod yazmasına,
+hata ayıklamasına ve projeler geliştirmesine
+yardımcı olmaktır.
 
-- HTML konusunda yardımcı olmak
-- CSS konusunda yardımcı olmak
-- JavaScript konusunda yardımcı olmak
-- Python konusunda yardımcı olmak
-- Kod hatalarını bulmak
-- Hataları anlaşılır şekilde açıklamak
-- Öğrencinin seviyesine uygun anlatmak
-- Kod geliştirme fikirleri vermek
-- Proje fikirleri üretmek
-- Kodun nasıl çalıştığını açıklamak
+Desteklediğin konular:
+
+- HTML
+- CSS
+- JavaScript
+- Python
+- Flask
+- SQL
+- PostgreSQL
+- Arduino
+- Java
+- C
+- C++
+- C#
+- oyun geliştirme
+- web geliştirme
+- algoritmalar
+- programlama mantığı
+- hata ayıklama
+- proje geliştirme
+
+ÖNEMLİ KOD KURALLARI:
+
+1. Kullanıcı kod isterse mümkün olduğunca
+   eksiksiz çalışan kod ver.
+
+2. Kullanıcı uzun bir proje isterse kodu
+   gereksiz yere kısaltma.
+
+3. Kodun devamını "..." ile kesme.
+
+4. Kodun önemli bölümlerini atlama.
+
+5. Kullanıcı özellikle tam kod isterse,
+   tam kod vermeye çalış.
+
+6. Kod üretirken kod bloklarını doğru şekilde
+   kullan.
+
+7. Kodun içinde açıklama gerekiyorsa
+   yorum satırları ekleyebilirsin.
+
+8. Kullanıcı bir hata gönderirse:
+   - hatanın nedenini açıkla
+   - çözümü göster
+   - gerekiyorsa düzeltilmiş kodu ver
+
+9. Öğrenci seviyesine uygun Türkçe kullan.
+
+10. Gereksiz uzun açıklamalar yapma.
+    Ancak uzun kod gerekiyorsa kodu eksiksiz ver.
+
+11. Bir oyun istendiğinde mümkün olduğunca
+    doğrudan çalıştırılabilir bir sürüm oluştur.
+
+12. Flappy Bird gibi oyunlarda HTML, CSS ve
+    JavaScript gerekiyorsa bunları tek bir HTML
+    dosyasında birleştirmek kullanıcı için
+    kolay olacaksa bunu tercih edebilirsin.
+
+13. Kodun çalışması için gerekli hiçbir kritik
+    bölümü bilerek çıkarma.
+
+14. Kullanıcı "tam kod", "komple kod",
+    "eksiksiz kod" veya benzeri bir ifade
+    kullanırsa özellikle eksiksiz cevap ver.
+
+15. Yanıtın ortasında kodu sebepsiz yere kesme.
 
 Yanıtlarını Türkçe ver.
-
-Kullanıcı bir hata soruyorsa:
-
-1. Hatanın nedenini söyle.
-2. Nasıl düzeltileceğini açıkla.
-3. Gerekirse düzeltilmiş kod örneği ver.
-
-Kullanıcı kod gönderirse kodu dikkatlice incele.
-
-Gereksiz yere çok uzun cevap verme.
-
-Kod hatasının çözümü için gereken
-kod parçalarını eksiksiz göster.
 
 Tehlikeli, yasa dışı veya zarar verici
 işlemler konusunda yardımcı olma.
@@ -592,28 +652,40 @@ Kullanıcının üzerinde çalıştığı kod:
 
 ----------------- CODE END -----------------
 
-Bu soruya yardımcı ol.
+Bu kullanıcıya yardımcı ol.
 
 Yanıtını Türkçe ver.
+
+Eğer kullanıcı kod istiyorsa mümkün olduğunca
+eksiksiz ve çalışabilir kod üret.
+
+Kullanıcı tam kod istiyorsa kodu kesme ve
+gereksiz şekilde özetleme.
 """
 
     # -----------------------------------------------------
-    # GEMINI REQUEST
+    # GEMINI 3.6 FLASH
+    # INTERACTIONS API
     # -----------------------------------------------------
 
     try:
 
-        response = gemini_client.models.generate_content(
+        interaction = gemini_client.interactions.create(
             model=AI_MODEL,
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=instructions,
-                max_output_tokens=2000,
-            ),
+            input=prompt,
+            system_instruction=instructions,
+            generation_config={
+                "thinking_level": "high",
+                "max_output_tokens": 65536,
+            },
         )
 
         answer = (
-            getattr(response, "text", None)
+            getattr(
+                interaction,
+                "output_text",
+                None
+            )
             or ""
         ).strip()
 
@@ -639,7 +711,7 @@ Yanıtını Türkçe ver.
             "answer": (
                 "FaziletCodeAI'ye bağlanırken "
                 "bir hata oluştu.\n\n"
-                "Render Logs bölümünü kontrol et."
+                f"Hata: {str(e)}"
             )
         }), 500
 
