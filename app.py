@@ -16,12 +16,12 @@ from flask import (
     flash,
     abort,
     send_file,
-    jsonify
+    jsonify,
 )
 
 from werkzeug.security import (
     generate_password_hash,
-    check_password_hash
+    check_password_hash,
 )
 
 # =========================================================
@@ -31,7 +31,6 @@ from werkzeug.security import (
 from google import genai
 from google.genai import types
 
-
 # =========================================================
 # FLASK
 # =========================================================
@@ -40,7 +39,7 @@ app = Flask(__name__)
 
 app.secret_key = os.environ.get(
     "SECRET_KEY",
-    "CHANGE_ME"
+    "CHANGE_ME",
 )
 
 DB = os.environ.get("DATABASE_URL")
@@ -50,14 +49,11 @@ if not DB:
         "DATABASE_URL environment variable bulunamadı."
     )
 
-
 # =========================================================
 # GEMINI / FAZİLETCODEAI
 # =========================================================
 
-GEMINI_API_KEY = os.environ.get(
-    "GEMINI_API_KEY"
-)
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 if GEMINI_API_KEY:
     try:
@@ -67,25 +63,16 @@ if GEMINI_API_KEY:
     except Exception as e:
         print(
             "Gemini client oluşturulamadı:",
-            repr(e)
+            repr(e),
         )
         gemini_client = None
 else:
     gemini_client = None
 
-
-# Render Environment üzerinden istenirse
-# model değiştirilebilir.
-#
-# Örneğin:
-#
-# FAZILETCODEAI_MODEL=gemini-3.6-flash
-#
 AI_MODEL = os.environ.get(
     "FAZILETCODEAI_MODEL",
-    "gemini-3.6-flash"
+    "gemini-2.5-flash",
 )
-
 
 # =========================================================
 # DATABASE
@@ -94,7 +81,7 @@ AI_MODEL = os.environ.get(
 def db():
     return psycopg.connect(
         DB,
-        row_factory=dict_row
+        row_factory=dict_row,
     )
 
 
@@ -107,7 +94,6 @@ def turkey_today():
     Türkiye UTC+3 kullanır.
     Render sunucusunun UTC saatinden Türkiye tarihini hesaplar.
     """
-
     return (
         datetime.now(timezone.utc)
         + timedelta(hours=3)
@@ -191,7 +177,7 @@ def init_db():
 
         admin_username = os.environ.get(
             "ADMIN_USERNAME",
-            "İsoLec_Baskan"
+            "İsoLec_Baskan",
         )
 
         admin_password = os.environ.get(
@@ -207,11 +193,10 @@ def init_db():
             FROM users
             WHERE username=%s
             """,
-            (admin_username,)
+            (admin_username,),
         ).fetchone()
 
         if not existing_admin:
-
             c.execute(
                 """
                 INSERT INTO users(
@@ -226,8 +211,8 @@ def init_db():
                     generate_password_hash(
                         admin_password
                     ),
-                    "admin"
-                )
+                    "admin",
+                ),
             )
 
         # =================================================
@@ -242,7 +227,6 @@ def init_db():
         ).fetchone()["n"]
 
         if week_count == 0:
-
             c.executemany(
                 """
                 INSERT INTO weeks(
@@ -254,21 +238,21 @@ def init_db():
                 [
                     (
                         "1. Hafta - Teknolojiye Giriş",
-                        "Teknoloji dünyasını tanıyoruz."
+                        "Teknoloji dünyasını tanıyoruz.",
                     ),
                     (
                         "2. Hafta - Yazılıma Giriş",
-                        "Algoritmalar ve temel programlama."
+                        "Algoritmalar ve temel programlama.",
                     ),
                     (
                         "3. Hafta - Web Tasarım",
-                        "HTML ve CSS ile web sayfası oluşturma."
+                        "HTML ve CSS ile web sayfası oluşturma.",
                     ),
                     (
                         "4. Hafta - Arduino",
-                        "Arduino ve temel elektronik devreler."
-                    )
-                ]
+                        "Arduino ve temel elektronik devreler.",
+                    ),
+                ],
             )
 
 
@@ -282,14 +266,13 @@ def user():
         return None
 
     with db() as c:
-
         return c.execute(
             """
             SELECT *
             FROM users
             WHERE id=%s
             """,
-            (session["uid"],)
+            (session["uid"],),
         ).fetchone()
 
 
@@ -299,10 +282,9 @@ def user():
 
 @app.context_processor
 def ctx():
-
     return {
         "current_user": user(),
-        "timedelta": timedelta
+        "timedelta": timedelta,
     }
 
 
@@ -356,7 +338,6 @@ def admin_req(f):
 def home():
 
     u = user()
-
     today = turkey_today()
 
     with db() as c:
@@ -376,7 +357,7 @@ def home():
             WHERE user_id=%s
             ORDER BY updated_at DESC
             """,
-            (u["id"],)
+            (u["id"],),
         ).fetchall()
 
         members = c.execute(
@@ -401,7 +382,7 @@ def home():
             WHERE user_id=%s
             ORDER BY day DESC
             """,
-            (u["id"],)
+            (u["id"],),
         ).fetchall()
 
     return render_template(
@@ -410,7 +391,7 @@ def home():
         projects=projects,
         members=members,
         attendance=attendance,
-        today=today
+        today=today,
     )
 
 
@@ -420,7 +401,7 @@ def home():
 
 @app.route(
     "/login",
-    methods=["GET", "POST"]
+    methods=["GET", "POST"],
 )
 def login():
 
@@ -428,12 +409,12 @@ def login():
 
         username = request.form.get(
             "username",
-            ""
+            "",
         ).strip()
 
         password = request.form.get(
             "password",
-            ""
+            "",
         )
 
         with db() as c:
@@ -444,16 +425,15 @@ def login():
                 FROM users
                 WHERE username=%s
                 """,
-                (username,)
+                (username,),
             ).fetchone()
 
         if u and check_password_hash(
             u["password_hash"],
-            password
+            password,
         ):
 
             session.clear()
-
             session["uid"] = u["id"]
 
             return redirect(
@@ -475,7 +455,7 @@ def login():
 
 @app.route(
     "/api/faziletcodeai",
-    methods=["POST"]
+    methods=["POST"],
 )
 @login_req
 def faziletcodeai_api():
@@ -531,7 +511,6 @@ def faziletcodeai_api():
     # -----------------------------------------------------
 
     if len(code) > 30000:
-
         code = code[:30000]
 
     # -----------------------------------------------------
@@ -605,9 +584,7 @@ Kullanıcının sorusu:
 Kullanıcının üzerinde çalıştığı kod:
 
 ---------------- CODE START ----------------
-
 {code}
-
 ----------------- CODE END -----------------
 
 Bu soruya yardımcı ol.
@@ -626,8 +603,8 @@ Yanıtını Türkçe ver.
             config=types.GenerateContentConfig(
                 system_instruction=instructions,
                 temperature=0.3,
-                max_output_tokens=2000
-            )
+                max_output_tokens=2000,
+            ),
         )
 
         answer = (
@@ -636,7 +613,6 @@ Yanıtını Türkçe ver.
         ).strip()
 
         if not answer:
-
             answer = (
                 "Üzgünüm, şu anda bir yanıt "
                 "oluşturamadım."
@@ -650,7 +626,7 @@ Yanıtını Türkçe ver.
 
         print(
             "FaziletCodeAI Gemini API ERROR:",
-            repr(e)
+            repr(e),
         )
 
         return jsonify({
@@ -683,7 +659,7 @@ def logout():
 
 @app.route(
     "/profile",
-    methods=["GET", "POST"]
+    methods=["GET", "POST"],
 )
 @login_req
 def profile():
@@ -696,7 +672,7 @@ def profile():
 
             action = request.form.get(
                 "action",
-                ""
+                "",
             )
 
             # -------------------------------------------------
@@ -718,7 +694,7 @@ def profile():
                 elif f.mimetype not in {
                     "image/png",
                     "image/jpeg",
-                    "image/webp"
+                    "image/webp",
                 }:
 
                     flash(
@@ -748,8 +724,8 @@ def profile():
                             (
                                 photo_data,
                                 f.mimetype,
-                                u["id"]
-                            )
+                                u["id"],
+                            ),
                         )
 
                         flash(
@@ -768,22 +744,22 @@ def profile():
                     FROM users
                     WHERE id=%s
                     """,
-                    (u["id"],)
+                    (u["id"],),
                 ).fetchone()
 
                 old_password = request.form.get(
                     "old",
-                    ""
+                    "",
                 )
 
                 new_password = request.form.get(
                     "new",
-                    ""
+                    "",
                 )
 
                 confirm_password = request.form.get(
                     "confirm",
-                    ""
+                    "",
                 )
 
                 if (
@@ -791,7 +767,7 @@ def profile():
                     and full
                     and check_password_hash(
                         full["password_hash"],
-                        old_password
+                        old_password,
                     )
                     and new_password == confirm_password
                     and len(new_password) >= 4
@@ -807,8 +783,8 @@ def profile():
                             generate_password_hash(
                                 new_password
                             ),
-                            u["id"]
-                        )
+                            u["id"],
+                        ),
                     )
 
                     flash(
@@ -827,7 +803,7 @@ def profile():
 
     return render_template(
         "profile.html",
-        u=u
+        u=u,
     )
 
 
@@ -835,9 +811,7 @@ def profile():
 # PROFILE PHOTO
 # =========================================================
 
-@app.route(
-    "/photo/<int:uid>"
-)
+@app.route("/photo/<int:uid>")
 @login_req
 def photo(uid):
 
@@ -851,7 +825,7 @@ def photo(uid):
             FROM users
             WHERE id=%s
             """,
-            (uid,)
+            (uid,),
         ).fetchone()
 
     if not x or not x["profile_photo"]:
@@ -861,7 +835,7 @@ def photo(uid):
         BytesIO(
             bytes(x["profile_photo"])
         ),
-        mimetype=x["profile_mime"]
+        mimetype=x["profile_mime"],
     )
 
 
@@ -871,14 +845,13 @@ def photo(uid):
 
 @app.route(
     "/projects/new",
-    methods=["GET", "POST"]
+    methods=["GET", "POST"],
 )
 @login_req
 def new_project():
 
     if request.method == "POST":
 
-        # JavaScript JSON gönderebilir.
         data = request.get_json(
             silent=True
         )
@@ -911,18 +884,14 @@ def new_project():
                 or "Yeni Proje"
             )
 
-            html_code = (
-                request.form.get(
-                    "html",
-                    ""
-                )
+            html_code = request.form.get(
+                "html",
+                "",
             )
 
-            python_code = (
-                request.form.get(
-                    "python",
-                    ""
-                )
+            python_code = request.form.get(
+                "python",
+                "",
             )
 
         with db() as c:
@@ -941,25 +910,24 @@ def new_project():
                     user()["id"],
                     title,
                     html_code,
-                    python_code
-                )
+                    python_code,
+                ),
             )
 
         return redirect(
             url_for("home")
         )
 
-    # project.html "project" bekliyor.
     new_project_data = {
         "id": None,
         "title": "Yeni Proje",
         "html_code": "",
-        "python_code": ""
+        "python_code": "",
     }
 
     return render_template(
         "project.html",
-        project=new_project_data
+        project=new_project_data,
     )
 
 
@@ -969,7 +937,7 @@ def new_project():
 
 @app.route(
     "/projects/<int:pid>",
-    methods=["GET", "POST"]
+    methods=["GET", "POST"],
 )
 @login_req
 def edit_project(pid):
@@ -982,7 +950,7 @@ def edit_project(pid):
             FROM projects
             WHERE id=%s
             """,
-            (pid,)
+            (pid,),
         ).fetchone()
 
     if not p:
@@ -1013,7 +981,7 @@ def edit_project(pid):
                 if "html_code" in data
                 else data.get(
                     "html",
-                    p["html_code"]
+                    p["html_code"],
                 )
             )
 
@@ -1022,7 +990,7 @@ def edit_project(pid):
                 if "python_code" in data
                 else data.get(
                     "python",
-                    p["python_code"]
+                    p["python_code"],
                 )
             )
 
@@ -1037,12 +1005,12 @@ def edit_project(pid):
 
             html_code = request.form.get(
                 "html",
-                p["html_code"]
+                p["html_code"],
             )
 
             python_code = request.form.get(
                 "python",
-                p["python_code"]
+                p["python_code"],
             )
 
         with db() as c:
@@ -1061,28 +1029,27 @@ def edit_project(pid):
                     title,
                     html_code,
                     python_code,
-                    pid
-                )
+                    pid,
+                ),
             )
 
-        # AJAX JSON isteğine JSON döndür.
         if data is not None:
 
             return jsonify({
                 "success": True,
-                "message": "Kod kaydedildi."
+                "message": "Kod kaydedildi.",
             })
 
         return redirect(
             url_for(
                 "edit_project",
-                pid=pid
+                pid=pid,
             )
         )
 
     return render_template(
         "project.html",
-        project=p
+        project=p,
     )
 
 
@@ -1090,9 +1057,7 @@ def edit_project(pid):
 # PROJECT PREVIEW
 # =========================================================
 
-@app.route(
-    "/preview/<int:pid>"
-)
+@app.route("/preview/<int:pid>")
 @login_req
 def preview(pid):
 
@@ -1104,7 +1069,7 @@ def preview(pid):
             FROM projects
             WHERE id=%s
             """,
-            (pid,)
+            (pid,),
         ).fetchone()
 
     if not p:
@@ -1120,7 +1085,7 @@ def preview(pid):
 
     return render_template(
         "preview.html",
-        p=p
+        p=p,
     )
 
 
@@ -1130,7 +1095,7 @@ def preview(pid):
 
 @app.route(
     "/attendance",
-    methods=["POST"]
+    methods=["POST"],
 )
 @login_req
 def attendance_mark():
@@ -1149,7 +1114,7 @@ def attendance_mark():
 
     selected = request.form.get(
         "day",
-        ""
+        "",
     )
 
     try:
@@ -1164,7 +1129,6 @@ def attendance_mark():
 
     today = turkey_today()
 
-    # Sadece bugün işaretlenebilir.
     if day != today:
 
         flash(
@@ -1192,8 +1156,8 @@ def attendance_mark():
             """,
             (
                 u["id"],
-                day
-            )
+                day,
+            ),
         )
 
     flash(
@@ -1265,7 +1229,7 @@ def admin():
         users=users,
         weeks=weeks,
         projects=projects,
-        att=att
+        att=att,
     )
 
 
@@ -1275,7 +1239,7 @@ def admin():
 
 @app.route(
     "/admin/member",
-    methods=["POST"]
+    methods=["POST"],
 )
 @admin_req
 def member():
@@ -1284,12 +1248,12 @@ def member():
 
         username = request.form.get(
             "username",
-            ""
+            "",
         ).strip()
 
         password = request.form.get(
             "password",
-            ""
+            "",
         )
 
         if not username or not password:
@@ -1317,8 +1281,8 @@ def member():
                     username,
                     generate_password_hash(
                         password
-                    )
-                )
+                    ),
+                ),
             )
 
         flash(
@@ -1342,14 +1306,14 @@ def member():
 
 @app.route(
     "/admin/reset/<int:uid>",
-    methods=["POST"]
+    methods=["POST"],
 )
 @admin_req
 def reset(uid):
 
     password = request.form.get(
         "password",
-        ""
+        "",
     )
 
     if not password:
@@ -1375,8 +1339,8 @@ def reset(uid):
                 generate_password_hash(
                     password
                 ),
-                uid
-            )
+                uid,
+            ),
         )
 
     flash(
@@ -1394,7 +1358,7 @@ def reset(uid):
 
 @app.route(
     "/admin/delete/<int:uid>",
-    methods=["POST"]
+    methods=["POST"],
 )
 @admin_req
 def delete(uid):
@@ -1407,7 +1371,7 @@ def delete(uid):
             WHERE id=%s
               AND role='member'
             """,
-            (uid,)
+            (uid,),
         )
 
     return redirect(
@@ -1421,19 +1385,19 @@ def delete(uid):
 
 @app.route(
     "/admin/week",
-    methods=["POST"]
+    methods=["POST"],
 )
 @admin_req
 def week():
 
     title = request.form.get(
         "title",
-        ""
+        "",
     ).strip()
 
     description = request.form.get(
         "description",
-        ""
+        "",
     ).strip()
 
     if not title:
@@ -1458,8 +1422,8 @@ def week():
             """,
             (
                 title,
-                description
-            )
+                description,
+            ),
         )
 
     return redirect(
@@ -1473,7 +1437,7 @@ def week():
 
 @app.route(
     "/admin/att",
-    methods=["POST"]
+    methods=["POST"],
 )
 @admin_req
 def att():
@@ -1493,7 +1457,6 @@ def att():
     )
 
     if not uid or not selected_day:
-
         abort(400)
 
     with db() as c:
@@ -1514,8 +1477,8 @@ def att():
             (
                 uid,
                 selected_day,
-                present
-            )
+                present,
+            ),
         )
 
     return redirect(
@@ -1541,11 +1504,8 @@ if __name__ == "__main__":
         port=int(
             os.environ.get(
                 "PORT",
-                5000
+                5000,
             )
         ),
-        debug=False
-    )
-        ),
-        debug=False
+        debug=False,
     )
