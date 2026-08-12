@@ -19,8 +19,17 @@ from flask import (
     jsonify
 )
 
-from werkzeug.security import generate_password_hash, check_password_hash
-from openai import OpenAI
+from werkzeug.security import (
+    generate_password_hash,
+    check_password_hash
+)
+
+# =========================================================
+# GOOGLE GEMINI
+# =========================================================
+
+from google import genai
+from google.genai import types
 
 
 # =========================================================
@@ -29,28 +38,53 @@ from openai import OpenAI
 
 app = Flask(__name__)
 
-app.secret_key = os.environ.get("SECRET_KEY", "CHANGE_ME")
+app.secret_key = os.environ.get(
+    "SECRET_KEY",
+    "CHANGE_ME"
+)
 
 DB = os.environ.get("DATABASE_URL")
 
 if not DB:
-    raise RuntimeError("DATABASE_URL environment variable bulunamadı.")
+    raise RuntimeError(
+        "DATABASE_URL environment variable bulunamadı."
+    )
 
 
 # =========================================================
-# OPENAI / FAZİLETCODEAI
+# GEMINI / FAZİLETCODEAI
 # =========================================================
 
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
+GEMINI_API_KEY = os.environ.get(
+    "GEMINI_API_KEY"
+)
 
-if OPENAI_API_KEY:
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+if GEMINI_API_KEY:
+    try:
+        gemini_client = genai.Client(
+            api_key=GEMINI_API_KEY
+        )
+    except Exception as e:
+        print(
+            "Gemini client oluşturulamadı:",
+            repr(e)
+        )
+        gemini_client = None
 else:
-    openai_client = None
+    gemini_client = None
 
 
-# FaziletCodeAI'nin kullanacağı model
-AI_MODEL = os.environ.get("FAZILETCODEAI_MODEL", "gpt-5-mini")
+# Render Environment üzerinden istenirse
+# model değiştirilebilir.
+#
+# Örneğin:
+#
+# FAZILETCODEAI_MODEL=gemini-3.6-flash
+#
+AI_MODEL = os.environ.get(
+    "FAZILETCODEAI_MODEL",
+    "gemini-3.6-flash"
+)
 
 
 # =========================================================
@@ -73,6 +107,7 @@ def turkey_today():
     Türkiye UTC+3 kullanır.
     Render sunucusunun UTC saatinden Türkiye tarihini hesaplar.
     """
+
     return (
         datetime.now(timezone.utc)
         + timedelta(hours=3)
@@ -87,7 +122,10 @@ def init_db():
 
     with db() as c:
 
+        # =================================================
         # USERS
+        # =================================================
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS users(
                 id SERIAL PRIMARY KEY,
@@ -96,11 +134,15 @@ def init_db():
                 role TEXT NOT NULL DEFAULT 'member',
                 profile_photo BYTEA,
                 profile_mime TEXT,
-                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMPTZ
+                    DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
+        # =================================================
         # WEEKS
+        # =================================================
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS weeks(
                 id SERIAL PRIMARY KEY,
@@ -109,7 +151,10 @@ def init_db():
             )
         """)
 
+        # =================================================
         # PROJECTS
+        # =================================================
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS projects(
                 id SERIAL PRIMARY KEY,
@@ -124,7 +169,10 @@ def init_db():
             )
         """)
 
+        # =================================================
         # ATTENDANCE
+        # =================================================
+
         c.execute("""
             CREATE TABLE IF NOT EXISTS attendance(
                 id SERIAL PRIMARY KEY,
@@ -137,9 +185,9 @@ def init_db():
             )
         """)
 
-        # =====================================================
+        # =================================================
         # ADMIN
-        # =====================================================
+        # =================================================
 
         admin_username = os.environ.get(
             "ADMIN_USERNAME",
@@ -150,14 +198,15 @@ def init_db():
             "ADMIN_PASSWORD"
         )
 
-        # Eğer ADMIN_PASSWORD Render'da verilmemişse,
-        # mevcut sistemdeki eski davranışı korumak için
-        # başlangıç şifresini kullanır.
         if not admin_password:
             admin_password = "32145178"
 
         existing_admin = c.execute(
-            "SELECT 1 FROM users WHERE username=%s",
+            """
+            SELECT 1
+            FROM users
+            WHERE username=%s
+            """,
             (admin_username,)
         ).fetchone()
 
@@ -174,17 +223,22 @@ def init_db():
                 """,
                 (
                     admin_username,
-                    generate_password_hash(admin_password),
+                    generate_password_hash(
+                        admin_password
+                    ),
                     "admin"
                 )
             )
 
-        # =====================================================
+        # =================================================
         # DEFAULT WEEKS
-        # =====================================================
+        # =================================================
 
         week_count = c.execute(
-            "SELECT COUNT(*) AS n FROM weeks"
+            """
+            SELECT COUNT(*) AS n
+            FROM weeks
+            """
         ).fetchone()["n"]
 
         if week_count == 0:
@@ -230,7 +284,11 @@ def user():
     with db() as c:
 
         return c.execute(
-            "SELECT * FROM users WHERE id=%s",
+            """
+            SELECT *
+            FROM users
+            WHERE id=%s
+            """,
             (session["uid"],)
         ).fetchone()
 
@@ -258,7 +316,9 @@ def login_req(f):
     def w(*a, **k):
 
         if not user():
-            return redirect(url_for("login"))
+            return redirect(
+                url_for("login")
+            )
 
         return f(*a, **k)
 
@@ -276,7 +336,10 @@ def admin_req(f):
 
         current = user()
 
-        if not current or current["role"] != "admin":
+        if (
+            not current
+            or current["role"] != "admin"
+        ):
             abort(403)
 
         return f(*a, **k)
@@ -299,7 +362,11 @@ def home():
     with db() as c:
 
         weeks = c.execute(
-            "SELECT * FROM weeks ORDER BY id"
+            """
+            SELECT *
+            FROM weeks
+            ORDER BY id
+            """
         ).fetchall()
 
         projects = c.execute(
@@ -351,7 +418,10 @@ def home():
 # LOGIN
 # =========================================================
 
-@app.route("/login", methods=["GET", "POST"])
+@app.route(
+    "/login",
+    methods=["GET", "POST"]
+)
 def login():
 
     if request.method == "POST":
@@ -394,11 +464,13 @@ def login():
             "Kullanıcı adı veya şifre yanlış."
         )
 
-    return render_template("login.html")
+    return render_template(
+        "login.html"
+    )
 
 
 # =========================================================
-# FAZİLETCODEAI
+# FAZİLETCODEAI - GEMINI
 # =========================================================
 
 @app.route(
@@ -439,26 +511,24 @@ def faziletcodeai_api():
         }), 400
 
     # -----------------------------------------------------
-    # API KEY KONTROLÜ
+    # GEMINI API KEY KONTROLÜ
     # -----------------------------------------------------
 
-    if not openai_client:
+    if not gemini_client:
 
         return jsonify({
             "answer": (
-                "FaziletCodeAI şu anda yapılandırılmamış. "
+                "FaziletCodeAI şu anda "
+                "yapılandırılmamış. "
                 "Render Environment bölümünde "
-                "OPENAI_API_KEY değişkenini kontrol et."
+                "GEMINI_API_KEY değişkenini "
+                "kontrol et."
             )
         }), 503
 
     # -----------------------------------------------------
     # KODU SINIRLA
     # -----------------------------------------------------
-    #
-    # Çok büyük kodların gereksiz şekilde API'ye
-    # gönderilmesini önlüyoruz.
-    #
 
     if len(code) > 30000:
 
@@ -477,7 +547,7 @@ def faziletcodeai_api():
     )
 
     # -----------------------------------------------------
-    # SYSTEM / INSTRUCTIONS
+    # SYSTEM INSTRUCTIONS
     # -----------------------------------------------------
 
     instructions = """
@@ -503,6 +573,7 @@ Görevin:
 Yanıtlarını Türkçe ver.
 
 Kullanıcı bir hata soruyorsa:
+
 1. Hatanın nedenini söyle.
 2. Nasıl düzeltileceğini göster.
 3. Gerekirse düzeltilmiş kod örneği ver.
@@ -510,6 +581,7 @@ Kullanıcı bir hata soruyorsa:
 Kullanıcı kod gönderirse kodu dikkatlice incele.
 
 Gereksiz yere çok uzun cevap verme.
+
 Ancak kod hatasının çözümü için gereken
 kod parçalarını eksiksiz göster.
 
@@ -531,27 +603,37 @@ Kullanıcının sorusu:
 {question}
 
 Kullanıcının üzerinde çalıştığı kod:
+
 ---------------- CODE START ----------------
+
 {code}
+
 ----------------- CODE END -----------------
 
 Bu soruya yardımcı ol.
+Yanıtını Türkçe ver.
 """
 
-
     # -----------------------------------------------------
-    # OPENAI REQUEST
+    # GEMINI REQUEST
     # -----------------------------------------------------
 
     try:
 
-        response = openai_client.responses.create(
+        response = gemini_client.models.generate_content(
             model=AI_MODEL,
-            instructions=instructions,
-            input=prompt
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                system_instruction=instructions,
+                temperature=0.3,
+                max_output_tokens=2000
+            )
         )
 
-        answer = response.output_text
+        answer = (
+            getattr(response, "text", None)
+            or ""
+        ).strip()
 
         if not answer:
 
@@ -566,18 +648,17 @@ Bu soruya yardımcı ol.
 
     except Exception as e:
 
-        # Gerçek hatayı kullanıcıya göstermiyoruz.
-        # Ayrıntı Render Logs bölümünde görülebilir.
         print(
-            "FaziletCodeAI API ERROR:",
+            "FaziletCodeAI Gemini API ERROR:",
             repr(e)
         )
 
         return jsonify({
             "answer": (
                 "FaziletCodeAI'ye bağlanırken "
-                "bir hata oluştu. Biraz sonra tekrar dene. "
-                "Sorun devam ederse Render Logs bölümünü kontrol et."
+                "bir hata oluştu. Biraz sonra "
+                "tekrar dene. Sorun devam ederse "
+                "Render Logs bölümünü kontrol et."
             )
         }), 500
 
@@ -754,7 +835,9 @@ def profile():
 # PROFILE PHOTO
 # =========================================================
 
-@app.route("/photo/<int:uid>")
+@app.route(
+    "/photo/<int:uid>"
+)
 @login_req
 def photo(uid):
 
@@ -866,7 +949,7 @@ def new_project():
             url_for("home")
         )
 
-    # project.html artık "project" değişkeni bekliyor.
+    # project.html "project" bekliyor.
     new_project_data = {
         "id": None,
         "title": "Yeni Proje",
@@ -928,13 +1011,19 @@ def edit_project(pid):
             html_code = (
                 data.get("html_code")
                 if "html_code" in data
-                else data.get("html", p["html_code"])
+                else data.get(
+                    "html",
+                    p["html_code"]
+                )
             )
 
             python_code = (
                 data.get("python_code")
                 if "python_code" in data
-                else data.get("python", p["python_code"])
+                else data.get(
+                    "python",
+                    p["python_code"]
+                )
             )
 
         else:
@@ -1001,7 +1090,9 @@ def edit_project(pid):
 # PROJECT PREVIEW
 # =========================================================
 
-@app.route("/preview/<int:pid>")
+@app.route(
+    "/preview/<int:pid>"
+)
 @login_req
 def preview(pid):
 
@@ -1224,7 +1315,9 @@ def member():
                 """,
                 (
                     username,
-                    generate_password_hash(password)
+                    generate_password_hash(
+                        password
+                    )
                 )
             )
 
@@ -1279,7 +1372,9 @@ def reset(uid):
               AND role='member'
             """,
             (
-                generate_password_hash(password),
+                generate_password_hash(
+                    password
+                ),
                 uid
             )
         )
@@ -1342,6 +1437,7 @@ def week():
     ).strip()
 
     if not title:
+
         flash(
             "Hafta başlığı gerekli."
         )
@@ -1447,6 +1543,9 @@ if __name__ == "__main__":
                 "PORT",
                 5000
             )
+        ),
+        debug=False
+    )
         ),
         debug=False
     )
