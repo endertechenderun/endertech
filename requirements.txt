@@ -2,4 +2,4 @@ Flask>=3.0,<4
 Gunicorn>=23,<24
 psycopg[binary]>=3.2,<4
 Werkzeug>=3,<4
-google-genai
+google-genai>=1.0,<2
