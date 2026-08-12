@@ -1,1 +1,37 @@
-{% extends "base.html" %}{% block content %}<div class="box"><h2>📚 Haftalık Konular</h2><div class="grid">{% for w in weeks %}<div class="box"><h3>{{w.title}}</h3><p>{{w.description}}</p></div>{% endfor %}</div></div><div class="box"><h2>🛠️ Projelerim</h2><a class="btn green" href="/projects/new">Yeni Proje</a>{% for p in projects %}<div class="box"><h3>{{p.title}}</h3><a class="btn blue" href="/projects/{{p.id}}">Düzenle</a><a class="btn" href="/preview/{{p.id}}">HTML Önizleme</a></div>{% else %}<p>Henüz proje yok.</p>{% endfor %}</div><div class="box"><h2>📧 Soru Gönder</h2><a class="btn" href="mailto:endertechenderun@gmail.com?subject=Endertech%20Sorusu">endertechenderun@gmail.com</a></div>{% endblock %}
+{% extends "base.html" %}{% block title %}Endertech{% endblock %}{% block content %}
+<div class="box"><h2>⚡ Endertech Bilişim Atölyesi</h2><p class="muted">Hoş geldin, {{current_user.username}}. Kulübün güncel alanlarına buradan ulaşabilirsin.</p></div>
+
+<div class="box"><h2>👥 Endertech Üyeleri</h2>
+<div class="members">
+{% for m in members %}
+<div class="member">
+{% if m.profile_photo %}<img class="member-photo" src="/photo/{{m.id}}">{% else %}<div class="member-photo" style="display:grid;place-items:center;background:#ffffff12">👤</div>{% endif %}
+<span>{{m.username}}</span>
+</div>
+{% else %}<p class="muted">Henüz başka üye yok.</p>{% endfor %}
+</div></div>
+
+{% if current_user.role=='member' %}
+<div class="box"><h2>🗓️ Günlük Yoklama</h2>
+<p class="muted">Yalnızca Türkiye saatine göre <b>bugünün</b> yoklaması aktiftir. Yeni gün gece 00:00'da otomatik açılır.</p>
+<div class="attendance-days">
+{% for i in range(7) %}
+{% set d=today + timedelta(days=i) %}
+{% set marked=false %}
+{% for a in attendance %}{% if a.day == d and a.present %}{% set marked=true %}{% endif %}{% endfor %}
+<div class="day {% if d==today %}today{% else %}disabled{% endif %}">
+<strong>{{d.strftime('%d.%m.%Y')}}</strong>
+<div class="check">{% if marked %}✅{% elif d==today %}⬜{% else %}🔒{% endif %}</div>
+{% if d==today and not marked %}
+<form method="post" action="{{url_for('attendance_mark')}}"><input type="hidden" name="day" value="{{d.isoformat()}}"><button class="btn green">Bugün Geldim</button></form>
+{% elif marked %}<span class="muted">İşaretlendi</span>
+{% else %}<span class="muted">Gece 00:00'da açılır</span>{% endif %}
+</div>
+{% endfor %}
+</div></div>
+{% endif %}
+
+<div class="box"><h2>📚 Haftalık Konular</h2><div class="grid">{% for w in weeks %}<div class="box"><h3>{{w.title}}</h3><p>{{w.description}}</p></div>{% endfor %}</div></div>
+<div class="box"><h2>🛠️ Projelerim</h2><a class="btn green" href="{{url_for('new_project')}}">➕ Yeni Proje</a>{% for p in projects %}<div class="box"><h3>{{p.title}}</h3><a class="btn blue" href="/projects/{{p.id}}">Düzenle</a><a class="btn" href="/preview/{{p.id}}">HTML Önizleme</a></div>{% else %}<p class="muted">Henüz proje yok.</p>{% endfor %}</div>
+<div class="box"><h2>📧 Soru Gönder</h2><a class="btn" href="mailto:endertechenderun@gmail.com?subject=Endertech%20Sorusu">endertechenderun@gmail.com</a></div>
+{% endblock %}

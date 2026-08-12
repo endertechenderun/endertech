@@ -1,1 +1,116 @@
-{% extends "base.html" %}{% block content %}<div class="box"><h2>🛠️ Proje</h2><form method="post"><input name="title" value="{{p.title if p else ''}}" placeholder="Proje adı" required><h3>HTML</h3><textarea name="html">{{p.html_code if p else ''}}</textarea><h3>Python</h3><textarea name="python">{{p.python_code if p else ''}}</textarea><p>Python kodu güvenlik nedeniyle sunucuda çalıştırılmaz, sadece saklanır.</p><button class="btn green">Kaydet</button></form></div>{% endblock %}
+{% extends "base.html" %}
+{% block title %}FaziletCodeAI • Proje{% endblock %}
+{% block content %}
+<div class="box">
+  <h2>🛠️ {{ project.title }}</h2>
+  <p class="muted">HTML ve Python çalışmalarını burada geliştirebilirsin.</p>
+</div>
+
+<div class="ai-layout">
+  <section class="box">
+    <h2>💻 Kod Editörü</h2>
+    <div class="editor-tabs">
+      <button class="btn active" id="htmlTab" onclick="showEditor('html')">HTML</button>
+      <button class="btn" id="pyTab" onclick="showEditor('python')">Python</button>
+    </div>
+
+    <textarea id="htmlEditor" style="min-height:430px">{{ project.html_code or '' }}</textarea>
+    <textarea id="pyEditor" style="display:none;min-height:430px">{{ project.python_code or '' }}</textarea>
+
+    <div class="row">
+      <button class="btn green" onclick="saveCode()">💾 Kaydet</button>
+      <button class="btn blue" onclick="previewHTML()">▶️ HTML Önizleme</button>
+      <button class="btn" onclick="sendCodeToAI()">🤖 Kodu FaziletCodeAI'ya Gönder</button>
+    </div>
+  </section>
+
+  <aside class="box ai-panel">
+    <h2>🤖 FaziletCodeAI</h2>
+    <p class="muted">HTML ve Python çalışmalarında sana yardımcı olan kulüp asistanı.</p>
+    <div id="messages" class="ai-messages">
+      <div class="ai-msg ai-bot"><b>FaziletCodeAI:</b><br>Merhaba! Kodunu göndererek hata bulma, açıklama veya geliştirme konusunda yardım isteyebilirsin.</div>
+    </div>
+    <div style="margin-top:12px">
+      <textarea id="aiQuestion" style="min-height:90px" placeholder="Örn: Bu kodda hata var mı?"></textarea>
+      <button class="btn full" onclick="askAI()">Gönder →</button>
+    </div>
+  </aside>
+</div>
+
+<script>
+let activeEditor='html';
+
+function showEditor(which){
+  activeEditor=which;
+  document.getElementById('htmlEditor').style.display=which==='html'?'block':'none';
+  document.getElementById('pyEditor').style.display=which==='python'?'block':'none';
+  document.getElementById('htmlTab').classList.toggle('active',which==='html');
+  document.getElementById('pyTab').classList.toggle('active',which==='python');
+}
+
+function addMessage(text, cls){
+  const box=document.getElementById('messages');
+  const div=document.createElement('div');
+  div.className='ai-msg '+cls;
+  div.innerHTML=text.replace(/\n/g,'<br>');
+  box.appendChild(div);
+  box.scrollTop=box.scrollHeight;
+}
+
+function sendCodeToAI(){
+  const code=activeEditor==='html'
+    ? document.getElementById('htmlEditor').value
+    : document.getElementById('pyEditor').value;
+  if(!code.trim()){addMessage('Önce editöre biraz kod yazmalısın.','ai-bot');return;}
+  document.getElementById('aiQuestion').value =
+    'Bu '+activeEditor.toUpperCase()+' kodunu incele. Hataları bul ve öğrencinin anlayabileceği şekilde açıkla:\n\n'+code;
+}
+
+async function askAI(){
+  const q=document.getElementById('aiQuestion').value.trim();
+  if(!q)return;
+  addMessage('<b>Sen:</b><br>'+q,'ai-user');
+  document.getElementById('aiQuestion').value='';
+  addMessage('<b>FaziletCodeAI:</b><br>Yanıt hazırlanıyor...','ai-bot');
+
+  // Gerçek AI bağlantısı için backend endpointi.
+  // Endpoint henüz bağlı değilse demo mesajı gösterir.
+  try{
+    const r=await fetch('/api/faziletcodeai',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({question:q,code:activeEditor==='html'
+        ? document.getElementById('htmlEditor').value
+        : document.getElementById('pyEditor').value})
+    });
+    const data=await r.json();
+    const msgs=document.querySelectorAll('#messages .ai-bot');
+    const last=msgs[msgs.length-1];
+    last.innerHTML='<b>FaziletCodeAI:</b><br>'+((data.answer||'Yanıt alınamadı.').replace(/\n/g,'<br>'));
+  }catch(e){
+    const msgs=document.querySelectorAll('#messages .ai-bot');
+    const last=msgs[msgs.length-1];
+    last.innerHTML='<b>FaziletCodeAI:</b><br>AI bağlantısı henüz sunucuya bağlanmadı. Arayüz hazır; gerçek model bağlantısını Render tarafında güvenli şekilde ekleyeceğiz.';
+  }
+}
+
+async function saveCode(){
+  const body={
+    html_code:document.getElementById('htmlEditor').value,
+    python_code:document.getElementById('pyEditor').value
+  };
+  const r=await fetch(location.pathname,{
+    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
+  });
+  if(r.ok){alert('Kod kaydedildi.');}
+  else{alert('Kaydetme sırasında hata oluştu.');}
+}
+
+function previewHTML(){
+  const w=window.open();
+  w.document.open();
+  w.document.write(document.getElementById('htmlEditor').value);
+  w.document.close();
+}
+</script>
+{% endblock %}
